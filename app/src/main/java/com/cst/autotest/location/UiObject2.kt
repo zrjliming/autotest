@@ -55,13 +55,13 @@ class UiObject2 {
         private val holder: Holder = Holder
         private val objectStore: com.cst.autotest.ObjectStore = Holder.objectStore
         /**
-         * Clicks a UiObject2 stored in Holder.objectStore.
+         * 点击保存在 Holder.objectStore 中的 UiObject2。
          *
-         * Typical button-click flow:
-         * 1. A findObject/findObjects route matches a button and stores the UiObject2.
-         * 2. The API response returns an oid for that button.
-         * 3. The client calls GET /v2/uiObject2/{oid}/click.
-         * 4. This method resolves the oid and invokes UiObject2.click().
+         * 典型按钮点击流程：
+         * 1. findObject 或 findObjects 路由匹配按钮，并保存对应的 UiObject2。
+         * 2. 接口响应返回这个按钮的 oid。
+         * 3. 客户端调用 GET /v2/uiObject2/{oid}/click。
+         * 4. 这个方法解析 oid，并调用 UiObject2.click()。
          */
         fun response(): StatusResponse {
             uiObject2(oid, objectStore)?.let {

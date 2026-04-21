@@ -222,11 +222,11 @@ class UiDevice {
     @Location("/click")
     /*inner*/ class Click(private val parent: UiDevice = UiDevice()) {
         /**
-         * Handles GET /v2/uiDevice/click with x/y query parameters.
+         * 处理带 x/y 查询参数的 GET /v2/uiDevice/click。
          *
-         * This path is used when the caller already knows the absolute screen coordinate.
-         * Ktor creates this class from the HTTP request, then response() delegates to
-         * Holder.uiDevice.click(x, y), which sends the tap through UiAutomator.
+         * 调用方已经知道按钮的屏幕绝对坐标时走这条链路。
+         * Ktor 根据 HTTP 请求创建这个类，随后 response() 委托给
+         * Holder.uiDevice.click(x, y)，由 UiAutomator 真正发出点击事件。
          */
         class Get(private val x: Int, private val y: Int, private val parent: Click = Click()) {
             private val holder: Holder = Holder
@@ -242,20 +242,20 @@ class UiDevice {
         }
 
         /**
-         * Handles POST /v2/uiDevice/click with a JSON body containing multiple points.
+         * 处理 POST /v2/uiDevice/click，请求体中包含多个点击坐标。
          *
-         * Each point is clicked in order through Holder.uiDevice. The route only returns OK when
-         * every UiAutomator click reports success.
+         * 每个坐标都会按顺序交给 Holder.uiDevice 点击。
+         * 只有所有 UiAutomator 点击都成功时，接口才返回 OK。
          */
-        // WARNING: ktor is not passing this argument so the '?' and null are needed
-        // see https://github.com/ktorio/ktor/issues/190
+        // Ktor 不会传入这个参数，因此这里必须使用可空类型和默认 null。
+        // 参考：https://github.com/ktorio/ktor/issues/190
         /*inner*/ class Post(val body: ClickBody? = null, private val parent: Click = Click()) {
             private val holder: Holder = Holder
 
             fun response(body: ClickBody): Any {
                 var result = true
                 body.points?.forEach {
-                    // This is the final handoff from HTTP data to device input.
+                    // 这里是 HTTP 数据移交给设备输入的最后一步。
                     Log.i(TAG, "clicking on (${it}), result=${result}")
                     result = result && holder.uiDevice.click(it.x!!, it.y!!)
                 }

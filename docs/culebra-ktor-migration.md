@@ -2,9 +2,9 @@
 
 ## 概述
 
-本项目参考 `/Users/ruijie/daypop/code/demo/CulebraTester2-public`，将 CulebraTester2 的 Ktor HTTP API 和 Android UiAutomator 自动化能力迁移到当前项目中。
+本项目参考 Ktor HTTP API 和 Android UiAutomator 自动化能力
 
-当前项目包名保持为 `com.cst.autotest`，没有使用额外的 `culebra` 子包。Ktor 路由、Location 类、Swagger model、Selector 工具和 instrumentation helper 已按当前包名调整。
+当前项目包名保持为 `com.cst.autotest`，Ktor 路由、Location 类、Swagger model、Selector 工具和 instrumentation helper 
 
 ## 主要模块
 

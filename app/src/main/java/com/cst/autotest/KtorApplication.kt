@@ -36,6 +36,16 @@ import io.swagger.server.models.SwipeBody
 import io.swagger.server.models.Text
 import java.io.File
 
+/**
+ * Ktor 服务的主入口，负责安装通用插件并注册 `/v2` 下的自动化接口路由。
+ *
+ * 从收到 HTTP 请求到点击按钮的大致链路：
+ * 1. Ktor 根据 URL 匹配这里注册的 Location 路由。
+ * 2. 路由对象的 `response()` 方法读取参数或请求体。
+ * 3. `response()` 通过 `Holder` 获取 UiAutomator 运行时对象。
+ * 4. 坐标点击直接调用 `Holder.uiDevice.click(...)`；控件点击先用 oid 从
+ *    `Holder.objectStore` 找到按钮对象，再调用对应控件的 `click()`。
+ */
 @KtorExperimentalLocationsAPI
 @Suppress("unused")
 @kotlin.jvm.JvmOverloads
@@ -49,11 +59,11 @@ fun Application.module(testing: Boolean = false) {
     install(Authentication) {
     }
 
-    // This feature enables compression automatically when accepted by the client.
+    // 客户端支持压缩时，这个插件会自动压缩响应。
     install(Compression) {
     }
 
-    // See https://enable-cors.org
+    // 允许跨域访问，方便外部客户端直接调用测试接口。
     install(CORS) {
         anyHost()
     }
@@ -71,10 +81,10 @@ fun Application.module(testing: Boolean = false) {
     }
 
     install(ShutDownUrl.ApplicationCallFeature) {
-        // The URL that will be intercepted (you can also use the application.conf's ktor.deployment.shutdown.url key)
+        // 被拦截的关闭地址，也可以通过 application.conf 的 ktor.deployment.shutdown.url 配置。
         shutDownUrl = shutdownUrl
-        // A function that will be executed to get the exit code of the process
-        exitCodeSupplier = { 0 } // ApplicationCall.() -> Int
+        // 返回进程退出码的函数，类型是 ApplicationCall.() -> Int。
+        exitCodeSupplier = { 0 }
     }
 
     routing {
@@ -95,7 +105,7 @@ fun Application.module(testing: Boolean = false) {
             )
         }
 
-        // Static feature. Try to access `/static/ktor_logo.svg`
+        // 静态资源路由，例如可以访问 `/static/ktor_logo.svg`。
         static("/static") {
             resources("static")
         }
@@ -152,9 +162,9 @@ fun Application.module(testing: Boolean = false) {
             }
 
             post<Device.Locale.Post> {
-                // We have to get the body as ktor doesn't do it
-                // see https://github.com/ktorio/ktor/issues/190
-                // also, it.body is null here
+                // Ktor 不会自动把请求体放进 Location 对象，需要在路由里手动读取。
+                // 参考：https://github.com/ktorio/ktor/issues/190
+                // 这里的 it.body 为 null。
                 // println("body ${it.body}");
                 val body = call.receive<Locale>()
                 call.respond(it.response(body))
@@ -184,22 +194,20 @@ fun Application.module(testing: Boolean = false) {
                 call.respond(it.response())
             }
 
-            // HTTP flow for coordinate click:
-            // GET /v2/uiDevice/click?x=10&y=20 is matched by Ktor Locations and deserialized
-            // into UiDevice.Click.Get. The route calls response(), which uses Holder.uiDevice
-            // to execute UiAutomator's click at the requested screen coordinates.
+            // 坐标点击的 HTTP 链路：
+            // GET /v2/uiDevice/click?x=10&y=20 由 Ktor Locations 匹配并反序列化为
+            // UiDevice.Click.Get。路由调用 response()，再通过 Holder.uiDevice 在指定屏幕坐标执行点击。
             get<UiDevice.Click.Get> {
                 call.respond(it.response())
             }
 
-            // HTTP flow for batch coordinate click:
-            // POST /v2/uiDevice/click receives a JSON ClickBody. Ktor does not bind request
-            // bodies into Location classes here, so the body is read explicitly and passed to
-            // UiDevice.Click.Post.response(), which clicks each supplied point.
+            // 批量坐标点击的 HTTP 链路：
+            // POST /v2/uiDevice/click 接收 JSON 格式的 ClickBody。Ktor 这里不会把请求体绑定到
+            // Location 类，因此显式读取 body 后传给 UiDevice.Click.Post.response()，再逐个点击传入坐标。
             post<UiDevice.Click.Post> {
-                // We have to get the body as ktor doesn't do it
-                // see https://github.com/ktorio/ktor/issues/190
-                // also, it.body is null here
+                // Ktor 不会自动把请求体放进 Location 对象，需要在路由里手动读取。
+                // 参考：https://github.com/ktorio/ktor/issues/190
+                // 这里的 it.body 为 null。
                 // println("body ${it.body}");
                 val body = call.receive<ClickBody>()
                 call.respond(it.response(body))
@@ -218,7 +226,7 @@ fun Application.module(testing: Boolean = false) {
             }
 
             get<UiDevice.DumpWindowHierarchy> {
-                // We may check call.request.headers["accept"] to determine if it's xml/json
+                // 后续可以根据 call.request.headers["accept"] 判断返回 XML 还是 JSON。
                 call.respondText(it.response())
             }
 
@@ -235,9 +243,9 @@ fun Application.module(testing: Boolean = false) {
             }
 
             post<UiDevice.FindObject.Post> {
-                // We have to get the body as ktor doesn't do it
-                // see https://github.com/ktorio/ktor/issues/190
-                // also, it.body is null here
+                // Ktor 不会自动把请求体放进 Location 对象，需要在路由里手动读取。
+                // 参考：https://github.com/ktorio/ktor/issues/190
+                // 这里的 it.body 为 null。
                 // println("body ${it.body}");
                 val selector = call.receive<Selector>()
                 call.respond(it.response(selector))
@@ -248,9 +256,9 @@ fun Application.module(testing: Boolean = false) {
             }
 
             post<UiDevice.FindObjects.Post> {
-                // We have to get the body as ktor doesn't do it
-                // see https://github.com/ktorio/ktor/issues/190
-                // also, it.body is null here
+                // Ktor 不会自动把请求体放进 Location 对象，需要在路由里手动读取。
+                // 参考：https://github.com/ktorio/ktor/issues/190
+                // 这里的 it.body 为 null。
                 // println("body ${it.body}");
                 val selector = call.receive<Selector>()
                 call.respond(it.response(selector))
@@ -329,9 +337,9 @@ fun Application.module(testing: Boolean = false) {
             }
 
             post<UiDevice.HasObject.Post> {
-                // We have to get the body as ktor doesn't do it
-                // see https://github.com/ktorio/ktor/issues/190
-                // also, it.body is null here
+                // Ktor 不会自动把请求体放进 Location 对象，需要在路由里手动读取。
+                // 参考：https://github.com/ktorio/ktor/issues/190
+                // 这里的 it.body 为 null。
                 // println("body ${it.body}");
                 val selector = call.receive<Selector>()
                 call.respond(it.response(selector))
@@ -350,9 +358,9 @@ fun Application.module(testing: Boolean = false) {
             }
 
             post<UiDevice.Swipe.Post> {
-                // We have to get the body as ktor doesn't do it
-                // see https://github.com/ktorio/ktor/issues/190
-                // also, it.body is null here
+                // Ktor 不会自动把请求体放进 Location 对象，需要在路由里手动读取。
+                // 参考：https://github.com/ktorio/ktor/issues/190
+                // 这里的 it.body 为 null。
                 // println("body ${it.body}");
                 val body = call.receive<SwipeBody>()
                 call.respond(it.response(body))
@@ -378,10 +386,9 @@ fun Application.module(testing: Boolean = false) {
                 call.respond(it.response())
             }
 
-            // HTTP flow for legacy UiObject button click:
-            // callers first create an object id through findObject, then call
-            // GET /v2/uiObject/{oid}/click. The oid is resolved from Holder.objectStore and
-            // the stored UiObject receives the actual click() call.
+            // 旧版 UiObject 按钮点击的 HTTP 链路：
+            // 调用方先通过 findObject 创建对象 id，再请求 GET /v2/uiObject/{oid}/click。
+            // response() 会用 oid 从 Holder.objectStore 取回按钮对象，并对保存的 UiObject 执行 click()。
             get<UiObject.Click> {
                 call.respond(it.response())
             }
@@ -423,9 +430,9 @@ fun Application.module(testing: Boolean = false) {
             }
 
             post<UiObject.PerformTwoPointerGesture.Post> {
-                // We have to get the body as ktor doesn't do it
-                // see https://github.com/ktorio/ktor/issues/190
-                // also, it.body is null here
+                // Ktor 不会自动把请求体放进 Location 对象，需要在路由里手动读取。
+                // 参考：https://github.com/ktorio/ktor/issues/190
+                // 这里的 it.body 为 null。
                 // println("body ${it.body}");
                 val body = call.receive<PerformTwoPointerGestureBody>()
                 call.respond(it.response(body))
@@ -447,9 +454,9 @@ fun Application.module(testing: Boolean = false) {
                 call.respond(it.response())
             }
 
-            // HTTP flow for UiObject2 button click:
-            // GET /v2/uiObject2/{oid}/click resolves the object id created by findObject or
-            // findObjects, then invokes UiObject2.click() on the matched button/view.
+            // UiObject2 按钮点击的 HTTP 链路：
+            // GET /v2/uiObject2/{oid}/click 会解析 findObject 或 findObjects 创建的对象 id，
+            // 再对匹配到的按钮或视图调用 UiObject2.click()。
             get<UiObject2.Click> {
                 call.respond(it.response())
             }
@@ -467,9 +474,9 @@ fun Application.module(testing: Boolean = false) {
             }
 
             post<UiObject2.FindObject.Post> {
-                // We have to get the body as ktor doesn't do it
-                // see https://github.com/ktorio/ktor/issues/190
-                // also, it.body is null here
+                // Ktor 不会自动把请求体放进 Location 对象，需要在路由里手动读取。
+                // 参考：https://github.com/ktorio/ktor/issues/190
+                // 这里的 it.body 为 null。
                 // println("body ${it.body}");
                 val selector = call.receive<Selector>()
                 call.respond(it.response(selector))
@@ -500,9 +507,9 @@ fun Application.module(testing: Boolean = false) {
             }
 
             post<UiObject2.SetText.Post> {
-                // We have to get the body as ktor doesn't do it
-                // see https://github.com/ktorio/ktor/issues/190
-                // also, it.body is null here
+                // Ktor 不会自动把请求体放进 Location 对象，需要在路由里手动读取。
+                // 参考：https://github.com/ktorio/ktor/issues/190
+                // 这里的 it.body 为 null。
                 // println("body ${it.body}");
                 val text = call.receive<Text>()
                 call.respond(it.response(text))
@@ -517,9 +524,9 @@ fun Application.module(testing: Boolean = false) {
             }
 
             post<Until.FindObject.Post> {
-                // We have to get the body as ktor doesn't do it
-                // see https://github.com/ktorio/ktor/issues/190
-                // also, it.body is null here
+                // Ktor 不会自动把请求体放进 Location 对象，需要在路由里手动读取。
+                // 参考：https://github.com/ktorio/ktor/issues/190
+                // 这里的 it.body 为 null。
                 // println("body ${it.body}");
                 val selector = call.receive<Selector>()
                 call.respond(it.response(selector))
@@ -530,9 +537,9 @@ fun Application.module(testing: Boolean = false) {
             }
 
             post<Until.FindObjects.Post> {
-                // We have to get the body as ktor doesn't do it
-                // see https://github.com/ktorio/ktor/issues/190
-                // also, it.body is null here
+                // Ktor 不会自动把请求体放进 Location 对象，需要在路由里手动读取。
+                // 参考：https://github.com/ktorio/ktor/issues/190
+                // 这里的 it.body 为 null。
                 // println("body ${it.body}");
                 val selector = call.receive<Selector>()
                 call.respond(it.response(selector))
@@ -544,7 +551,7 @@ fun Application.module(testing: Boolean = false) {
 
         }
 
-        // Handles all the other non-matched routes returning a 404 not found.
+        // 所有未匹配的路由都会走这里，并返回 404。
         route("{...}") {
             println("🦄")
             handle {
@@ -596,15 +603,14 @@ fun Application.module(testing: Boolean = false) {
 }
 
 /**
- * Sends the content of [file] as a response using the provided [contentType].
+ * 按指定的 [contentType] 将 [file] 的内容作为响应返回。
  */
 suspend inline fun ApplicationCall.respondImage(
     file: File,
     contentType: ContentType = ContentType.Image.PNG
 ) {
-    // for some reason this doesn't work and return a 500 error
+    // 这里不能直接设置响应头或使用 respondFile，否则会返回 500。
     // response.headers.append(HttpHeaders.ContentType, ContentType.Image.PNG.toString())
-    // so we cannot use respondFile
     //respondFile(file)
     val bytes = file.readBytes()
     respondBytes(bytes, contentType, HttpStatusCode.OK)

@@ -60,12 +60,12 @@ class UiObject {
         private val holder: Holder = Holder
         private val objectStore: com.cst.autotest.ObjectStore = Holder.objectStore
         /**
-         * Clicks a legacy UiObject stored in Holder.objectStore.
+         * 点击保存在 Holder.objectStore 中的旧版 UiObject。
          *
-         * Typical button-click flow:
-         * 1. A previous findObject route stores a UiObject and returns its oid.
-         * 2. The client calls GET /v2/uiObject/{oid}/click.
-         * 3. This method resolves oid from objectStore and calls UiObject.click().
+         * 典型按钮点击流程：
+         * 1. 前面的 findObject 路由保存一个 UiObject，并返回它的 oid。
+         * 2. 客户端调用 GET /v2/uiObject/{oid}/click。
+         * 3. 这个方法从 objectStore 解析 oid，并调用 UiObject.click()。
          */
         fun response(): StatusResponse {
             uiObject(oid, objectStore)?.let {

@@ -1,10 +1,10 @@
 # autotest
 
-当前项目已迁移 `/Users/ruijie/daypop/code/demo/CulebraTester2-public` 的 Ktor/UiAutomator 服务能力，包名保持为 `com.cst.autotest`。
+
 
 ## 文档
 
-- [迁移说明](docs/culebra-ktor-migration.md)
+当前项目android自动化测试。通过http进行请求，主要通过UiAutomation
 
 ## 构建验证
 
