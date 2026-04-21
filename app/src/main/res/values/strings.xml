@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">autotest</string>
+    <string name="msg_instrumentation_not_installed">Instrumentation not installed.\nInstall it before proceeding.</string>
+    <string name="msg_start_server">You can now start the Ktor server by running the instrumentation helper.</string>
+    <string name="msg_start_server_command">./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.cst.autotest.UiAutomatorHelper</string>
+    <string name="help__device__display_real_size">Gets the display real size.</string>
+    <string name="help__device__wait_for_new_toast">Waits for a new Toast until timeout.</string>
+</resources>

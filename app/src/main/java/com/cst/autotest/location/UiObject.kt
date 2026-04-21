@@ -1,0 +1,363 @@
+package com.cst.autotest.location
+
+import android.graphics.Point
+import androidx.core.graphics.component1
+import androidx.core.graphics.component2
+import androidx.core.graphics.component3
+import androidx.core.graphics.component4
+import com.cst.autotest.Holder
+import com.cst.autotest.ObjectStore
+import com.cst.autotest.utils.BySelectorBundle
+import com.cst.autotest.utils.uiSelectorBundleFromString
+import io.ktor.http.HttpStatusCode
+import io.ktor.locations.KtorExperimentalLocationsAPI
+import io.ktor.locations.Location
+import io.ktor.swagger.experimental.HttpException
+import io.swagger.server.models.BooleanResponse
+import io.swagger.server.models.NumberResponse
+import io.swagger.server.models.ObjectRef
+import io.swagger.server.models.PerformTwoPointerGestureBody
+import io.swagger.server.models.Rect
+import io.swagger.server.models.Selector
+import io.swagger.server.models.StatusCode
+import io.swagger.server.models.StatusResponse
+import io.swagger.server.models.StringResponse
+import java.math.BigDecimal
+
+private const val TAG = "UiObject"
+
+/**
+ * See https://github.com/ktorio/ktor/issues/1660 for the reason why we need the extra parameter
+ * in nested classes:
+ *
+ * "One of the problematic features is nested location classes and nested location objects.
+ *
+ * What we are thinking of to change:
+ *
+ * a nested location class should always have a property of the outer class or object
+ * nested objects in objects are not allowed
+ * The motivation for the first point is the fact that a location class nested to another, makes no
+ * sense without the ability to refer to the outer class."
+ */
+@KtorExperimentalLocationsAPI
+@Location("/uiObject")
+class UiObject {
+    @Location("/{oid}/clearTextField")
+    /*inner*/ class ClearTextField(val oid: Int, private val parent: UiObject = UiObject()) {
+        private val holder: Holder = Holder
+        private val objectStore: com.cst.autotest.ObjectStore = Holder.objectStore
+        fun response(): StatusResponse {
+            uiObject(oid, objectStore)?.let {
+                it.clearTextField()
+                return@response StatusResponse(StatusResponse.Status.OK)
+            }
+            throw notFound(oid)
+        }
+    }
+
+    @Location("/{oid}/click")
+    /*inner*/ class Click(val oid: Int, private val parent: UiObject = UiObject()) {
+        private val holder: Holder = Holder
+        private val objectStore: com.cst.autotest.ObjectStore = Holder.objectStore
+        /**
+         * Clicks a legacy UiObject stored in Holder.objectStore.
+         *
+         * Typical button-click flow:
+         * 1. A previous findObject route stores a UiObject and returns its oid.
+         * 2. The client calls GET /v2/uiObject/{oid}/click.
+         * 3. This method resolves oid from objectStore and calls UiObject.click().
+         */
+        fun response(): StatusResponse {
+            uiObject(oid, objectStore)?.let {
+                if (it.click()) {
+                    return@response StatusResponse(StatusResponse.Status.OK)
+                }
+                return@response StatusResponse(StatusResponse.Status.ERROR)
+            }
+            throw notFound(oid)
+        }
+    }
+
+    @Location("/{oid}/clickAndWaitForNewWindow")
+    /*inner*/ class ClickAndWaitForNewWindow(
+        private val oid: Int,
+        private val timeout: Long? = null,
+        private val parent: UiObject = UiObject()
+    ) {
+        private val holder: Holder = Holder
+        private val objectStore: com.cst.autotest.ObjectStore = Holder.objectStore
+        fun response(): BooleanResponse {
+            uiObject(oid, objectStore)?.let {
+                timeout?.let { timeout ->
+                    return@response BooleanResponse(
+                        "result",
+                        it.clickAndWaitForNewWindow(timeout)
+                    )
+                }
+
+                return@response BooleanResponse(
+                    "result",
+                    it.clickAndWaitForNewWindow()
+                )
+            }
+            throw notFound(oid)
+        }
+    }
+
+    @Location("/{oid}/dump")
+    /*inner*/ class Dump(val oid: Int, private val parent: UiObject = UiObject()) {
+        private val holder: Holder = Holder
+        private val objectStore: com.cst.autotest.ObjectStore = Holder.objectStore
+        fun response(): Selector {
+            uiObject(oid, objectStore)?.let {
+                return@response Selector(it)
+            }
+            throw notFound(oid)
+        }
+    }
+
+    @Location("/{oid}/exists")
+    /*inner*/ class Exists(
+        val oid: Int,
+        private val parent: UiObject = UiObject()
+    ) {
+        private val holder: Holder = Holder
+        private val objectStore: com.cst.autotest.ObjectStore = Holder.objectStore
+        fun response(): BooleanResponse {
+            uiObject(oid, objectStore)?.let {
+                return@response BooleanResponse("exists", it.exists())
+            }
+            throw notFound(oid)
+        }
+    }
+
+    @Location("/{oid}/getBounds")
+    /*inner*/ class GetBounds(
+        val oid: Int,
+        private val parent: UiObject = UiObject()
+    ) {
+        private val holder: Holder = Holder
+        private val objectStore: com.cst.autotest.ObjectStore = Holder.objectStore
+        fun response(): Rect {
+            uiObject(oid, objectStore)?.let {
+                val (left, top, right, bottom) = it.bounds
+                return@response Rect(left = left, top = top, right = right, bottom = bottom)
+            }
+            throw notFound(oid)
+        }
+    }
+
+    @Location("/{oid}/getChild")
+    /*inner*/ class GetChild(
+        val oid: Int,
+        private val uiSelector: String? = null,
+        private val parent: UiObject = UiObject()
+    ) {
+        private val holder: Holder = Holder
+        private val objectStore: com.cst.autotest.ObjectStore = Holder.objectStore
+        fun response(): ObjectRef {
+            uiSelector?.let { uis ->
+                val usb = uiSelectorBundleFromString(uis)
+                uiObject(oid, objectStore)?.let { obj ->
+                    obj.getChild(usb.selector)?.let {
+                        val newOid = objectStore.put(it)
+                        return@response ObjectRef(newOid, it.className)
+                    }
+                    throw HttpException(
+                        HttpStatusCode.NotFound,
+                        StatusCode.OBJECT_NOT_FOUND.message("getChild could not find any object matching selector")
+                    )
+                }
+                throw notFound(oid)
+            }
+            throw HttpException(
+                HttpStatusCode.InternalServerError,
+                StatusCode.ARGUMENT_MISSING.message("uiSelector must be provided and not empty")
+            )
+        }
+    }
+
+    @Location("/{oid}/getChildCount")
+    /*inner*/ class GetChildCount(
+        val oid: Int,
+        private val parent: UiObject = UiObject()
+    ) {
+        private val holder: Holder = Holder
+        private val objectStore: com.cst.autotest.ObjectStore = Holder.objectStore
+        fun response(): NumberResponse {
+            uiObject(oid, objectStore)?.let {
+                return@response NumberResponse("childCount", BigDecimal(it.childCount))
+            }
+            throw notFound(oid)
+        }
+    }
+
+    @Location("/{oid}/getClassName")
+    /*inner*/ class GetClassName(
+        val oid: Int,
+        private val parent: UiObject = UiObject()
+    ) {
+        private val holder: Holder = Holder
+        private val objectStore: com.cst.autotest.ObjectStore = Holder.objectStore
+        fun response(): StringResponse {
+            uiObject(oid, objectStore)?.let {
+                return@response StringResponse("className", it.className)
+            }
+            throw notFound(oid)
+        }
+    }
+
+
+    @Location("/{oid}/getContentDescription")
+    /*inner*/ class GetContentDescription(
+        val oid: Int,
+        private val parent: UiObject = UiObject()
+    ) {
+        private val holder: Holder = Holder
+        private val objectStore: com.cst.autotest.ObjectStore = Holder.objectStore
+        fun response(): StringResponse {
+            uiObject(oid, objectStore)?.let {
+                return@response StringResponse("contentDescription", it.contentDescription)
+            }
+            throw notFound(oid)
+        }
+    }
+
+    @Location("/{oid}/getFromParent")
+    /*inner*/ class GetFromParent(
+        val oid: Int,
+        private val uiSelector: String? = null,
+        private val parent: UiObject = UiObject()
+    ) {
+        private val holder: Holder = Holder
+        private val objectStore: com.cst.autotest.ObjectStore = Holder.objectStore
+        fun response(): ObjectRef {
+            uiSelector?.let { uis ->
+                val usb = uiSelectorBundleFromString(uis)
+                uiObject(oid, objectStore)?.let { obj ->
+                    obj.getFromParent(usb.selector)?.let {
+                        val newOid = objectStore.put(it)
+                        return@response ObjectRef(newOid, it.className)
+                    }
+                    throw HttpException(
+                        HttpStatusCode.NotFound,
+                        StatusCode.OBJECT_NOT_FOUND.message("getFromParent could not find any object matching selector")
+                    )
+                }
+                throw notFound(oid)
+            }
+            throw HttpException(
+                HttpStatusCode.InternalServerError,
+                StatusCode.ARGUMENT_MISSING.message("uiSelector must be provided and not empty")
+            )
+        }
+    }
+
+    @Location("/{oid}/performTwoPointerGesture")
+    /*inner*/ class PerformTwoPointerGesture(val oid: Int) {
+        // WARNING: ktor is not passing this argument so the '?' and null are needed
+        // see https://github.com/ktorio/ktor/issues/190
+        class Post(
+            val body: PerformTwoPointerGestureBody? = null,
+            private val performTwoPointerGesture: PerformTwoPointerGesture,
+            val parent: UiObject = UiObject()
+        ) {
+            private val holder: Holder = Holder
+        private val objectStore: com.cst.autotest.ObjectStore = Holder.objectStore
+            fun response(body: PerformTwoPointerGestureBody): StatusResponse {
+                uiObject(performTwoPointerGesture.oid, objectStore)?.let {
+                    val s1 = Point(body.startPoint1.x!!, body.startPoint1.y!!)
+                    val s2 = Point(body.startPoint2.x!!, body.startPoint2.y!!)
+                    val e1 = Point(body.endPoint1.x!!, body.endPoint1.y!!)
+                    val e2 = Point(body.endPoint2.x!!, body.endPoint2.y!!)
+                    if (it.performTwoPointerGesture(s1, s2, e1, e2, body.steps)) {
+                        return@response StatusResponse(
+                            StatusResponse.Status.OK
+                        )
+                    }
+                    return StatusResponse(StatusResponse.Status.ERROR)
+                }
+                throw notFound(performTwoPointerGesture.oid)
+            }
+        }
+    }
+
+    @Location("/{oid}/pinchIn")
+    /*inner*/ class PinchIn(
+        val oid: Int,
+        private val percentage: Int,
+        private val steps: Int,
+        private val parent: UiObject = UiObject()
+    ) {
+        private val holder: Holder = Holder
+        private val objectStore: com.cst.autotest.ObjectStore = Holder.objectStore
+        fun response(): StatusResponse {
+            uiObject(oid, objectStore)?.let {
+                if (it.pinchIn(percentage, steps)) {
+                    return@response StatusResponse(StatusResponse.Status.OK)
+                }
+                return StatusResponse(StatusResponse.Status.ERROR)
+            }
+            throw notFound(oid)
+        }
+    }
+
+    @Location("/{oid}/pinchOut")
+    /*inner*/ class PinchOut(
+        val oid: Int,
+        private val percentage: Int,
+        private val steps: Int,
+        private val parent: UiObject = UiObject()
+    ) {
+        private val holder: Holder = Holder
+        private val objectStore: com.cst.autotest.ObjectStore = Holder.objectStore
+        fun response(): StatusResponse {
+            uiObject(oid, objectStore)?.let {
+                if (it.pinchOut(percentage, steps)) {
+                    return@response StatusResponse(StatusResponse.Status.OK)
+                }
+                return StatusResponse(StatusResponse.Status.ERROR)
+            }
+            throw notFound(oid)
+        }
+    }
+
+    @Location("/{oid}/waitForExists")
+    /*inner*/ class WaitForExists(
+        val oid: Int,
+        private val timeout: Long,
+        private val parent: UiObject = UiObject()
+    ) {
+        private val holder: Holder = Holder
+        private val objectStore: com.cst.autotest.ObjectStore = Holder.objectStore
+        fun response(): BooleanResponse {
+            uiObject(oid, objectStore)?.let {
+                return@response BooleanResponse("exists", it.waitForExists(timeout))
+            }
+            throw notFound(oid)
+        }
+    }
+
+    companion object {
+        /**
+         * Gets an object by its [oid].
+         */
+        fun uiObject(oid: Int, objectStore: ObjectStore) =
+            objectStore[oid] as androidx.test.uiautomator.UiObject?
+
+        fun notFound(oid: Int): HttpException {
+            return HttpException(HttpStatusCode.NotFound, "⚠️ Object with oid=${oid} not found")
+        }
+
+        fun notFound(selector: Selector): HttpException {
+            return HttpException(
+                HttpStatusCode.NotFound,
+                "⚠️ UiObject matching $selector not found"
+            )
+        }
+
+        private fun notFound(bsb: BySelectorBundle): Throwable {
+            return HttpException(HttpStatusCode.NotFound, "⚠️ UiObject matching $bsb not found")
+        }
+    }
+}
